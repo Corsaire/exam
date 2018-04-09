@@ -3,7 +3,7 @@
 ## Critical errors
 
 1.  #### ___Re-enterance attack is possible___
-    **Description** : Since contract is sending `1/3` of `balance` instead of `msg.value`, it's possible to make re-entrance attack. If `one` is a contract, it can make transaction on Splitters address in its fallback function and drain all ballance of splitter.
+    **Description** : Since contract is sending `1/3` of `balance` instead of `msg.value`, it's possible to make re-entrance attack. If `one` is a contract, it can make a transaction on Splitters address in its fallback function and drain all balance of the splitter.
 
     **Solution** : 
     * change `balance` to `msg.value`.  
@@ -17,9 +17,9 @@
 
     
 1. #### ___Contract balance___ 
-    **Description** : no way to receive Ether from contract.
+    **Description** : no way to receive Ether from the contract.
 
-    **Solution** : we need to add posibility to spend Ether from contract: 
+    **Solution** : we need to add the possibility to spend Ether from the contract: 
     * add all `owner` functionality
     * add `withdraw` function that transfers all balance to `owner`
 
