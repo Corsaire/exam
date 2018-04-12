@@ -2,7 +2,7 @@
 
 ## Critical errors
 
-1.  #### ___Constructor starts with lower case___ 
+1.  #### ___Constructor starts with the lower case___ 
     **Description** : `piggyBank` is just a function, that can be called anytime. Anyone can become the owner. 
 
     **Solution** : Rename `piggyBank` to `PiggyBank` in order to make it a constructor.
