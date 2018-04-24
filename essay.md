@@ -26,4 +26,6 @@ Imagine you travel to a ski resort and every ski lift up there has a different o
 But let's go back to the "toll roads". It could be very painful for drivers/vehicles to pay in different ways to different operators. On the other hand, creating one payment system for different operators can be very problematic too. It comes with all "centralized systems" problems, so operators can not feel safe with it.
 I think blockchain system fits perfectly here. With blockchain, we can arrange set of rules, how every payment is split between operators in case if one driver will use multiple toll roads. This solution will also make it easy for a new operator to join. It is much easier because this is open decentralized system and in order to join this system, you only need to register as a new operator in systems regulator.
 
-In conclusion, blockchain is a good fit to toll roads problem. It can add necessary transparency and make money transfers cheaper and easier. Moreover, blockchain allows us to create a single secure system for all operators, so drivers won't even bother that they need to pay different operators.
+## Conclusion
+
+Blockchain is a good fit to toll roads problem. It can add necessary transparency and make money transfers cheaper and easier. Moreover, blockchain allows us to create a single secure system for all operators, so drivers won't even bother that they need to pay different operators.
