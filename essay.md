@@ -4,7 +4,7 @@ There are a lot of problems in our world that have already been somehow solved u
 
 It's been solved as a centralized system that consists of regulated operators with their own centralized and non-transparent systems. As it is supposed to be with every regulated business, regulation is needed to ensure that everyone play by the rules. It's very important part of this business because some abuses from operators can lead to big troubles on the national level. On the other hand, regulators duty is to cause as small overhead to operators business as it's possible. So regulation should not stand in a way of effective evolution of toll roads business.
 
-So, what problems can blockchain solve? 
+So, what problems can blockchain solve?
 
 ## Transparency
 
@@ -13,7 +13,8 @@ Every operator has its own centralized systems that manage their toll roads. Bec
 We can add transparency by using a decentralized system, built on top of Ethereum. Every payment and its pricing formation will be public and anyone inside the network will have all information about it. It will make regulation easy and every driver will know how the price is made by the transparent algorithm inside the blockchain. You will know who you pay and how the price is formed.
 
 The downside of transparency is lack of privacy for every driver who does not want everyone to be able to track his movement. Even with centralized systems, there are a lot of dissatisfied drivers, who don't like that big companies/government can possibly track their movements. If this system is made on top of public Ethereum network, anyone can track your movements and it's a disaster. There are a few ways how we can solve this issue:
-* Make private/consortium blockchain system, so only operators and regulator can see all the information. In order to pay for everything with real Ether, this blockchain can be connected to the main network with Plasma/Polkadot/Cosmos or any other future implementation of inter-blockchain comunication system. That will keep some transparency, the regulator will still have a good control of everything and the operators won't be able to change the rules anytime they want (as it could theoretically be in a centralized system). That solution will keep the privacy violation problem on the current level.
+
+* Make private/consortium blockchain system, so only operators and regulator can see all the information. In order to pay for everything with real Ether, this blockchain can be connected to the main network using Plasma or any inter-blockchain comunication system like Polkadot/Cosmos. That will keep some transparency, the regulator will still have a good control of everything and the operators won't be able to change the rules anytime they want (as they theoretically could in a centralized system). That solution will keep the privacy violation problem on the current level.
 * Use some algorithms for anonymizing drivers and vehicles. Or just use other more anonymous blockchains instead of Ethereum. For this problem, anonymizing algorithms should be very good in order to keep privacy, because machine learning can make a lot of miracles nowadays.
 
 ## Banking
