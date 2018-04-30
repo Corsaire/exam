@@ -1,14 +1,40 @@
 pragma solidity ^0.4.21;
 
-
 import "./interfaces/TollBoothOperatorI.sol";
 import "./RoutePriceHolder.sol";
 import "./Pausable.sol";
 import "./Regulated.sol";
+import "./Regulator.sol";
 import "./DepositHolder.sol";
 import "./MultiplierHolder.sol";
 
-contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolder, Pausable, Regulated {
+contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolder, Pausable, Regulated, MultiplierHolder {
+
+    uint collectedFees;
+
+    enum Status { Empty, OnRoad, Pending, Finished }
+    struct VehicleOnRoad
+    {
+        address vehicle;        
+        uint deposit;
+        address entryBooth;
+        Status status;
+    }
+
+    struct PendingPayment
+    {
+        bytes32[] secretHashes;
+        uint startIndex;
+    }
+
+    mapping(bytes32 => VehicleOnRoad) public vehiclesOnRoad;
+    mapping(address => mapping(address => PendingPayment)) pendingPayments;
+
+    modifier onlyVehicle(address vehicle)
+    {
+        require(Regulator(regulator).getVehicleType(vehicle) != 0);
+        _;
+    }
 
     function TollBoothOperator(bool _paused, uint _deposit, address _regulator)
     Pausable(_paused)
@@ -19,6 +45,14 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
 
     }
 
+    function getMultiplierByVehicle(address vehicle)
+    constant
+    public
+    returns(uint)
+    {
+        var vType = Regulator(regulator).getVehicleType(vehicle);
+        return (getMultiplier(vType));
+    }
     /**
      * This provides a single source of truth for the encoding algorithm.
      * It will be called:
@@ -30,20 +64,12 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
     function hashSecret(bytes32 secret)
         constant
         public
-        returns(bytes32 hashed);
-
-    /**
-     * Event emitted when a vehicle made the appropriate deposit to enter the road system.
-     * @param vehicle The address of the vehicle that entered the road system.
-     * @param entryBooth The declared entry booth by which the vehicle will enter the system.
-     * @param exitSecretHashed A hashed secret that, when solved, allows the operator to pay itself.
-     * @param depositedWeis The amount that was deposited as part of the entry.
-     */
-    event LogRoadEntered(
-        address indexed vehicle,
-        address indexed entryBooth,
-        bytes32 indexed exitSecretHashed,
-        uint depositedWeis);
+        returns(bytes32 hashed)
+    {
+        require(secret != 0);
+        return keccak256(secret);
+        //require (Regulator(regulator).getVehicleType(msg.sender) > 0);
+    }
 
     /**
      * Called by the vehicle entering a road system.
@@ -66,12 +92,23 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
      *     The hashed secret used to deposit.
      *     The amount deposited by the vehicle.
      */
-    function enterRoad(
-            address entryBooth,
-            bytes32 exitSecretHashed)
+    function enterRoad(address entryBooth, bytes32 exitSecretHashed)
         public
         payable
-        returns (bool success);
+        whenNotPaused
+        returns (bool success)
+    {        
+        require(isTollBooth(entryBooth));             
+        require(vehiclesOnRoad[exitSecretHashed].status == Status.Empty);   
+        var mult = getMultiplierByVehicle(msg.sender);
+        require(mult != 0);        
+        require(msg.value >= getDeposit() * mult);
+
+        var vehicle = VehicleOnRoad(msg.sender, msg.value, entryBooth, Status.Empty);
+        vehiclesOnRoad[exitSecretHashed] = vehicle;
+        emit LogRoadEntered(msg.sender, entryBooth, exitSecretHashed, msg.value);
+        return true;
+    }
 
     /**
      * @param exitSecretHashed The hashed secret used by the vehicle when entering the road.
@@ -85,128 +122,111 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
     function getVehicleEntry(bytes32 exitSecretHashed)
         constant
         public
-        returns(
-            address vehicle,
-            address entryBooth,
-            uint depositedWeis);
+        returns(address vehicle, address entryBooth, uint depositedWeis)
+    {
+        var v = vehiclesOnRoad[exitSecretHashed];
+        return (v.vehicle, v.entryBooth, v.deposit);
+    }
 
-    /**
-     * Event emitted when a vehicle exits a road system.
-     * @param exitBooth The toll booth that saw the vehicle exit.
-     * @param exitSecretHashed The hash of the secret given by the vehicle as it
-     *     passed by the exit booth.
-     * @param finalFee The toll charge effectively paid by the vehicle, and taken from the deposit.
-     * @param refundWeis The amount refunded to the vehicle, i.e. deposit - charge.
-     */
-    event LogRoadExited(
-        address indexed exitBooth,
-        bytes32 indexed exitSecretHashed,
-        uint finalFee,
-        uint refundWeis);
-
-    /**
-     * Event emitted when a vehicle used a route that has no known fee.
-     * It is a signal for the oracle to provide a price for the entry / exit pair.
-     * @param exitSecretHashed The hashed secret that was defined at the time of entry.
-     * @param entryBooth The address of the booth the vehicle entered at.
-     * @param exitBooth The address of the booth the vehicle exited at.
-     */
-    event LogPendingPayment(
-        bytes32 indexed exitSecretHashed,
-        address indexed entryBooth,
-        address indexed exitBooth);
-
-    /**
-     * Called by the exit booth.
-     *     It should roll back when the contract is in the `true` paused state.
-     *     It should roll back when the sender is not a toll booth.
-     *     It should roll back when the vehicle is no longer a registered vehicle.
-     *     It should roll back when the vehicle is no longer allowed on this road system.
-     *     It should roll back if the exit is same as the entry.
-     *     It should roll back if hashing the secret does not match a hashed one.
-     *     It should roll back if the secret has already been reported on exit.
-     * @param exitSecretClear The secret given by the vehicle as it passed by the exit booth.
-     * @return status:
-     *   1: success, -> emits LogRoadExited with:
-     *       The sender of the action.
-     *       The hashed secret corresponding to the vehicle trip.
-     *       The effective charge paid by the vehicle.
-     *       The amount refunded to the vehicle.
-     *   2: pending oracle -> emits LogPendingPayment with:
-     *       The hashed secret corresponding to the vehicle trip.
-     *       The entry booth of the vehicle trip.
-     *       The exit booth of the vehicle trip.
-     */
     function reportExitRoad(bytes32 exitSecretClear)
         public
-        returns (uint status);
+        whenNotPaused
+        returns (uint status)
+    {
+        require(isTollBooth(msg.sender));
 
-    /**
-     * @param entryBooth the entry booth that has pending payments.
-     * @param exitBooth the exit booth that has pending payments.
-     * @return the number of payments that are pending because the price for the
-     * entry-exit pair was unknown.
-     */
+        var hashed = hashSecret(exitSecretClear);
+        VehicleOnRoad storage v = vehiclesOnRoad[hashed];
+        require(v.status == Status.OnRoad); 
+        var multiplier = getMultiplierByVehicle(v.vehicle);
+        require(multiplier != 0);     
+
+        var price = getRoutePrice(v.entryBooth, msg.sender) * multiplier;
+        if(price != 0)
+        {    
+            processPaymentUnsafe(v, hashed, price);        
+            return 1;
+        }
+        else 
+        {
+            emit LogPendingPayment(hashed, v.entryBooth, msg.sender);
+            v.status = Status.Pending;
+            return 2;
+        }
+    }
+
+    function processPaymentUnsafe(VehicleOnRoad storage v, bytes32 hashed, uint price) 
+    private 
+    returns(bool)
+    {
+        var deposit = v.deposit;
+        uint change = price < deposit ? deposit-price : 0;
+        collectedFees += deposit - change;
+        emit LogRoadExited(msg.sender, hashed, deposit-change, change);
+        v.status = Status.Finished;  
+        //Since it's said that all vehicles are externally owned accounts (not a contract) and the
+        //Regulator can actually check this before registering vehicle, we can safely use .transfer
+        //without fear that some of the transfers will be rejected and other payments will be locked
+        if(change > 0)
+            v.vehicle.transfer(change);
+        return true;
+    }
+
     function getPendingPaymentCount(address entryBooth, address exitBooth)
         constant
         public
-        returns (uint count);
+        returns (uint count)
+    {
+        var payments = pendingPayments[entryBooth][exitBooth];
+        return payments.secretHashes.length - payments.startIndex;
+    }
 
-    /**
-     * Can be called by anyone. In case more than 1 payment was pending when the oracle gave a price.
-     *     It should roll back when the contract is in `true` paused state.
-     *     It should roll back if booths are not really booths.
-     *     It should roll back if there are fewer than `count` pending payments that are solvable.
-     *     It should roll back if `count` is `0`.
-     * @param entryBooth the entry booth that has pending payments.
-     * @param exitBooth the exit booth that has pending payments.
-     * @param count the number of pending payments to clear for the exit booth.
-     * @return Whether the action was successful.
-     * Emits LogRoadExited as many times as count, each with:
-     *       The address of the exit booth.
-     *       The hashed secret corresponding to the vehicle trip.
-     *       The effective charge paid by the vehicle.
-     *       The amount refunded to the vehicle.
-     */
-    function clearSomePendingPayments(
-            address entryBooth,
-            address exitBooth,
-            uint count)
+    function clearSomePendingPayments(address entryBooth, address exitBooth, uint count)
         public
-        returns (bool success);
+        whenNotPaused
+        returns (bool success)
+    {                
+        require(isTollBooth(entryBooth));
+        require(isTollBooth(exitBooth));
+        require(count > 0);
 
-    /**
-     * @return The amount that has been collected through successful payments. This is the current
-     *   amount, it does not reflect historical fees. So this value goes back to zero after a call
-     *   to `withdrawCollectedFees`.
-     */
+        uint basePrice = getRoutePrice(entryBooth, exitBooth);
+        require(basePrice > 0);
+
+        var payments = pendingPayments[entryBooth][exitBooth];
+
+        require(count <= payments.secretHashes.length);
+        for(uint i = 0; i < count; i++)
+        {
+            var hashed = payments.secretHashes[payments.startIndex];
+            VehicleOnRoad storage v = vehiclesOnRoad[hashed];
+            processPaymentUnsafe(v,hashed, getMultiplierByVehicle(v.vehicle) * basePrice);
+            payments.startIndex++;
+        }
+        return true;
+    }
+
     function getCollectedFeesAmount()
         constant
         public
-        returns(uint amount);
+        returns(uint amount)
+    {
+        return collectedFees;
+    }
 
-    /**
-     * Event emitted when the owner collects the fees.
-     * @param owner The account that sent the request.
-     * @param amount The amount collected.
-     */
-    event LogFeesCollected(
-        address indexed owner,
-        uint amount);
 
-    /**
-     * Called by the owner of the contract to withdraw all collected fees (not deposits) to date.
-     *     It should roll back if any other address is calling this function.
-     *     It should roll back if there is no fee to collect.
-     *     It should roll back if the transfer failed.
-     * @return success Whether the operation was successful.
-     * Emits LogFeesCollected with:
-     *     The sender of the action.
-     *     The amount collected.
-     */
     function withdrawCollectedFees()
         public
-        returns(bool success);
+        fromOwner
+        returns(bool success)
+    {
+        require(collectedFees > 0);
+        uint amount = collectedFees;
+        collectedFees = 0;
+        owner.transfer(amount);
+        emit LogFeesCollected(owner, amount);
+        return true;
+    }
 
     /**
      * This function is commented out otherwise it prevents compilation of the completed contracts.
