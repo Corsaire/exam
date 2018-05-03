@@ -15,11 +15,12 @@ We can add transparency by using a decentralized system, built on top of Ethereu
 The downside of transparency is lack of privacy for every driver who does not want everyone to be able to track his movement. Even with centralized systems, there are a lot of dissatisfied drivers, who don't like that big companies/government can possibly track their movements. If this system is made on top of public Ethereum network, anyone can track your movements and it's a disaster. There are a few ways how we can solve this issue:
 
 * Make private/consortium blockchain system, so only operators and regulator can see all the information. In order to pay for everything with real Ether, this blockchain can be connected to the main network using Plasma or any inter-blockchain comunication system like Polkadot/Cosmos. That will keep some transparency, the regulator will still have a good control of everything and the operators won't be able to change the rules anytime they want (as they theoretically could in a centralized system). That solution will keep the privacy violation problem on the current level.
-* Use some algorithms for anonymizing drivers and vehicles. Or just use other more anonymous blockchains instead of Ethereum. For this problem, anonymizing algorithms should be very good in order to keep privacy, because machine learning can make a lot of miracles nowadays.
+* Use some algorithms for anonymizing drivers and vehicles. Or just use other more anonymous blockchains instead of Ethereum. For this problem, anonymizing algorithms should be very good in order to keep privacy, because machine learning can make a lot of miracles nowadays. 
 
 ## Banking
 
 Currently, all payments go through banks. Operators suffer from lots of bureaucracy and tons of papers that are needed for banks and regulators for every payment. Working through banks can be also very costly. Ethereum allows you to build a system that will make all money transfers through blockchain with no middleman and with small transaction cost.
+There is a known problem that Ethereum transactions are too expensive and Ethereum main network has a really low throughput. But I'm sure we will have many scaling options like Plasma/Raiden that will allow us to make cheap and secure transactions.
 
 ## Shared payment system
 

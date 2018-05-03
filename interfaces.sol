@@ -1,6 +1,6 @@
 /**
     This is a minimalistic interface of the one of multiple possible implementations.
-    In this version every vehicle registers on the road entrance and pays for its trip on the exit booth with transcations.
+    In this version every vehicle registers when it enters the road and pays for the trip on the exit booth with a transcation.
  */
 
 /**
@@ -24,7 +24,7 @@ contract Regulator is Owned
  */
 contract Regulated
 {
-    address regulator;    
+    address public regulator;    
     
     modifier onlyRegulator();
     

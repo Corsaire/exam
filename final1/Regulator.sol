@@ -42,9 +42,11 @@ contract Regulator is RegulatorI, Owned {
         fromOwner
         returns(TollBoothOperatorI newOperator)
     {
-        require(_owner != owner);
-        TollBoothOperator operator = new TollBoothOperator(true, _deposit, _owner);
+        require(_owner != getOwner());
+        TollBoothOperator operator = new TollBoothOperator(true, _deposit, address(this));
+        operator.setOwner(_owner);
         operators[address(operator)] = true;
+
         emit LogTollBoothOperatorCreated(msg.sender, operator, _owner, _deposit);
         return operator;
     }

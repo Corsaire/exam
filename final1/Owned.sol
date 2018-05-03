@@ -4,7 +4,7 @@ import "./interfaces/OwnedI.sol";
 
 contract Owned is OwnedI {
 
-    address internal owner;
+    address private owner;
     event LogOwnerSet(address indexed previousOwner, address indexed newOwner);
 
     modifier fromOwner() {

@@ -27,7 +27,7 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
         uint startIndex;
     }
 
-    mapping(bytes32 => VehicleOnRoad) public vehiclesOnRoad;
+    mapping(bytes32 => VehicleOnRoad) vehiclesOnRoad;
     mapping(address => mapping(address => PendingPayments)) pendingPayments;
 
     modifier onlyVehicle(address vehicle)
@@ -47,12 +47,13 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
 
     function getMultiplierByVehicle(address vehicle)
     constant
-    public
+    private
     returns(uint)
     {
         uint vType = Regulator(regulator).getVehicleType(vehicle);
         return (getMultiplier(vType));
     }
+
     /**
      * This provides a single source of truth for the encoding algorithm.
      * It will be called:
@@ -104,7 +105,7 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
         require(mult != 0);        
         require(msg.value >= getDeposit() * mult);
 
-        VehicleOnRoad memory vehicle = VehicleOnRoad(msg.sender, msg.value, entryBooth, Status.Empty);
+        VehicleOnRoad memory vehicle = VehicleOnRoad(msg.sender, msg.value, entryBooth, Status.OnRoad);
         vehiclesOnRoad[exitSecretHashed] = vehicle;
         emit LogRoadEntered(msg.sender, entryBooth, exitSecretHashed, msg.value);
         return true;
@@ -144,7 +145,7 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
         uint price = getRoutePrice(v.entryBooth, msg.sender) * multiplier;
         if(price != 0)
         {    
-            processPaymentUnsafe(v, hashed, price);        
+            processPaymentUnsafe(v, msg.sender, hashed, price);        
             return 1;
         }
         else 
@@ -156,15 +157,16 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
         }
     }
 
-    function processPaymentUnsafe(VehicleOnRoad storage v, bytes32 hashed, uint price) 
+    function processPaymentUnsafe(VehicleOnRoad storage v, address exitBooth, bytes32 hashed, uint price) 
     private 
     returns(bool)
     {
         uint deposit = v.deposit;
         uint change = price < deposit ? deposit - price : 0;
         collectedFees += deposit - change;
-        emit LogRoadExited(msg.sender, hashed, deposit - change, change);
+        emit LogRoadExited(exitBooth, hashed, deposit - change, change);
         v.status = Status.Finished;  
+        v.deposit = 0;
         //Since it's said that all vehicles are externally owned accounts (not a contract) and the
         //Regulator can actually check this before registering vehicle, we can safely use .transfer
         //without fear that some of the transfers will be rejected and other payments will be locked
@@ -204,7 +206,7 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
             uint mult = getMultiplierByVehicle(v.vehicle);
             if(mult == 0) 
                 return true;
-            processPaymentUnsafe(v,hashed, mult * basePrice);
+            processPaymentUnsafe(v, exitBooth, hashed, mult * basePrice);
             payments.startIndex++;
         }
         return true;
@@ -227,8 +229,8 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
         require(collectedFees > 0);
         uint amount = collectedFees;
         collectedFees = 0;
-        owner.transfer(amount);
-        emit LogFeesCollected(owner, amount);
+        getOwner().transfer(amount);
+        emit LogFeesCollected(getOwner(), amount);
         return true;
     }
 
@@ -255,7 +257,7 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
          public
          returns(bool success)
     {
-        super.setRoutePrice(entryBooth,exitBooth,priceWeis);        
+        super.setRoutePrice(entryBooth, exitBooth, priceWeis);        
         if(priceWeis != 0 && getPendingPaymentCount(entryBooth, exitBooth) >= 1)
         {
             PendingPayments storage payments = pendingPayments[entryBooth][exitBooth];
@@ -264,7 +266,7 @@ contract TollBoothOperator is TollBoothOperatorI, DepositHolder, RoutePriceHolde
             uint mult = getMultiplierByVehicle(v.vehicle);
             if(mult != 0)
             {
-                processPaymentUnsafe(v, hashed, mult * priceWeis);
+                processPaymentUnsafe(v, exitBooth, hashed, mult * priceWeis);
                 payments.startIndex++;
             }
         }
